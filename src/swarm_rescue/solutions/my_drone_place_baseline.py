@@ -34,6 +34,7 @@ class MyDronePlaceBaseline(DroneAbstract):
         self._last_place_step = -1000
         self._placed_positions = []
         self._peer = {}
+        self._completed = set()
         self._wall_votes = {}
         self._wall_set = set()
         self._wall_list = []
@@ -68,6 +69,7 @@ class MyDronePlaceBaseline(DroneAbstract):
         return {"id": int(self.identifier), "step": self._step,
                 "pos": self._pos, "goal": self._goal,
                 "inv": self.carried_bombs_count(),
+                "done": sorted(self._completed),
                 "walls": chunk, "bombs": self._placed_positions[-10:]}
 
     def control(self) -> CommandsDict:
@@ -77,6 +79,8 @@ class MyDronePlaceBaseline(DroneAbstract):
         self._update_pose()
         self._read_messages()
         inventory = self.carried_bombs_count()
+        if inventory == 0:
+            self._completed.add(int(self.identifier))
         if self._initial_inventory is None:
             self._initial_inventory = inventory
         if self._last_inventory is not None and inventory < self._last_inventory and self._pos:
@@ -137,6 +141,15 @@ class MyDronePlaceBaseline(DroneAbstract):
                 continue
             self._peer[peer_id] = (self._step, msg.get("inv"),
                                    msg.get("pos"), msg.get("goal"))
+            if msg.get("inv") == 0:
+                self._completed.add(peer_id)
+            # Completion can travel through intermediate drones after direct
+            # contact with the submitting drone has been lost.
+            done = msg.get("done")
+            if isinstance(done, (list, tuple)):
+                count = self._misc_data.number_drones if self._misc_data else 0
+                self._completed.update(i for i in done
+                                       if isinstance(i, int) and 0 <= i < count)
             for point in msg.get("walls", ()):
                 if (isinstance(point, (tuple, list)) and len(point) == 2 and
                         all(isinstance(v, int) for v in point)):
@@ -387,8 +400,7 @@ class MyDronePlaceBaseline(DroneAbstract):
         limit = self._limit()
         count = self._misc_data.number_drones if self._misc_data else None
         all_done = (count is not None and self.carried_bombs_count() == 0 and
-                    all(i in self._peer and self._step - self._peer[i][0] < 220 and
-                        self._peer[i][1] == 0 for i in range(count) if i != 0))
+                    all(i in self._completed for i in range(count)))
         if not ((all_done and self._step >= 0.58 * limit) or self._step >= 0.82 * limit):
             return
         w, h = (int(v) for v in self.size_area)
@@ -400,7 +412,8 @@ class MyDronePlaceBaseline(DroneAbstract):
         # The public size describes a ClosedPlayground with a 6 px wall frame.
         cv2.rectangle(grid, (2, 2), (w - 3, h - 3), 1, 5)
         print(f"[place-baseline] submit step={self._step}, walls={len(self._wall_set)}, "
-              f"inventory={self.carried_bombs_count()}, peers={len(self._peer)}")
+              f"inventory={self.carried_bombs_count()}, peers={len(self._peer)}, "
+              f"done={len(self._completed)}/{count}")
         self.submit_exploration_map(grid)
         self._submitted = True
 

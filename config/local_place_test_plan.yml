@@ -17,3 +17,17 @@ evaluation_plan:
     number_drones: 5
     initial_bombs_per_drone: 2
     zones_config: [NO_GPS_ZONE, NO_COM_ZONE]
+  - map_name: Map04
+    team_mode: place
+    nb_rounds: 1
+    config_weight: 1
+    number_drones: 5
+    initial_bombs_per_drone: 2
+    zones_config: []
+  - map_name: Map05
+    team_mode: place
+    nb_rounds: 1
+    config_weight: 1
+    number_drones: 5
+    initial_bombs_per_drone: 2
+    zones_config: []
