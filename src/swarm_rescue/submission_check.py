@@ -3,15 +3,21 @@ import re
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import yaml
 
+# Participant-facing name, produced by create_zip_submission.sh.
 SUBMISSION_ZIP_RE = re.compile(
     r"^team(\d{3})_(preliminary|semifinal|final)\.zip$"
 )
 
-EVAL_STEPS = ("preliminary", "semifinal", "final")
+# Organizer archive name. Submissions received by mail are renamed by the
+# backend to underscore-separated fields whose *second* field is the team
+# number, e.g. ``20261013_544_team544_blue_ve1.zip``. Participants never
+# produce this shape; it exists so an archived batch can be labelled with the
+# date, side and version it was received under.
+ARCHIVE_SUBMISSION_ZIP_RE = re.compile(r"^[^_]+_(\d+)(?:_[^_]+)*\.zip$")
 
 REQUIRED_ZIP_ENTRIES = (
     "my_drone_eval.py",
@@ -124,20 +130,60 @@ class SubmissionCheckResult:
         self.warnings.append(message)
 
 
+def parse_submission_team_number(name: str) -> Optional[int]:
+    """Return the team number encoded in a valid submission zip name.
+
+    A name is valid when it matches the participant format
+    (``teamNNN_{preliminary,semifinal,final}.zip``) or the organizer archive
+    format (``<field>_<team number>_<fields...>.zip``).
+    """
+    for pattern in (SUBMISSION_ZIP_RE, ARCHIVE_SUBMISSION_ZIP_RE):
+        match = pattern.match(name)
+        if match:
+            return int(match.group(1))
+    return None
+
+
 def is_valid_submission_name(name: str) -> bool:
-    return SUBMISSION_ZIP_RE.match(name) is not None
+    return parse_submission_team_number(name) is not None
 
 
-def parse_submission_zip_name(name: str) -> Optional[Tuple[int, str]]:
-    """Return (team_number, evalstep) when name is valid."""
-    match = SUBMISSION_ZIP_RE.match(name)
-    if not match:
-        return None
-    return int(match.group(1)), match.group(2)
+def is_submission_stem(stem: str) -> bool:
+    """True when *stem* is a submission directory name (a zip name without .zip)."""
+    return parse_submission_team_number(f"{stem}.zip") is not None
+
+
+def duplicate_team_numbers(zips: Iterable[Path]) -> Dict[int, List[Path]]:
+    """Return team number -> claiming zips, keeping only numbers claimed more than once."""
+    by_number: Dict[int, List[Path]] = {}
+    for zip_path in zips:
+        number = parse_submission_team_number(zip_path.name)
+        if number is None:
+            continue
+        by_number.setdefault(number, []).append(zip_path)
+    return {
+        number: paths
+        for number, paths in by_number.items()
+        if len(paths) > 1
+    }
+
+
+def format_duplicate_team_numbers(duplicates: Dict[int, List[Path]]) -> str:
+    """Render a duplicate-team-number report for an error message."""
+    return "; ".join(
+        f"{number:03d} ({', '.join(p.name for p in paths)})"
+        for number, paths in sorted(duplicates.items())
+    )
 
 
 def list_submission_zips(directory: Path) -> List[Path]:
-    """Return sorted valid submission zip paths in directory."""
+    """Return sorted valid submission zip paths in directory.
+
+    Team numbers must be unique inside one submissions directory: the evaluator
+    keys result directories, bomb artifacts and blue-team run names by the
+    number, so two zips claiming one number would overwrite each other's runs
+    and silently drop a team from the batch.
+    """
     if not directory.is_dir():
         raise FileNotFoundError(f"Submissions directory not found: {directory}")
 
@@ -145,6 +191,14 @@ def list_submission_zips(directory: Path) -> List[Path]:
         p for p in sorted(directory.iterdir())
         if p.is_file() and is_valid_submission_name(p.name)
     ]
+
+    duplicates = duplicate_team_numbers(zips)
+    if duplicates:
+        raise ValueError(
+            f"Duplicate team numbers in {directory}: "
+            f"{format_duplicate_team_numbers(duplicates)}"
+        )
+
     return zips
 
 
@@ -630,16 +684,14 @@ def validate_zip_archive(zip_path: Path) -> SubmissionCheckResult:
         result.add_error(f"File not found: {path}")
         return result
 
-    if not is_valid_submission_name(path.name):
+    team_number = parse_submission_team_number(path.name)
+    if team_number is None:
         result.add_error(
             "Zip file name must match teamNNN_{preliminary,semifinal,final}.zip "
+            "or the archive form <field>_<team number>_<fields>.zip "
             f"(got {path.name})"
         )
         return result
-
-    parsed = parse_submission_zip_name(path.name)
-    assert parsed is not None
-    team_number, _evalstep = parsed
 
     ok, err = validate_zip_contents(path)
     if not ok:
