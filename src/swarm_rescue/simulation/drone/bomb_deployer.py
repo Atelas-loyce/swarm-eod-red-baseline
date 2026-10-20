@@ -8,6 +8,7 @@ import numpy as np
 from swarm_rescue.simulation.drone.controller import PlaceBombController
 from swarm_rescue.simulation.drone.device import Device
 from swarm_rescue.simulation.elements.bomb import Bomb
+from swarm_rescue.simulation.utils.definitions import CollisionTypes
 from swarm_rescue.simulation.utils.pose import Pose
 
 if TYPE_CHECKING:
@@ -83,13 +84,21 @@ class BombDeployer(Device):
             return False
 
         bomb = Bomb(disposal_center=disposal_center)
+        init_coords = ((x, y), theta)
+
+        # A bomb that starts in contact with the disposal center is disposed by
+        # the first physics step, so it never becomes a bomb the blue team can
+        # search for and rescue. Refuse the placement.
+        if the_map.playground.overlaps_collision_type(
+                bomb, init_coords, CollisionTypes.DISPOSAL_CENTER):
+            return False
+
         # Red-team feature demo: keep newly-placed bombs from being pushed by
         # drones during placement (avoids "moving bombs" artifact).
         bomb.ignore_drone_collisions = True
 
         the_map._bombs.append(bomb)
         the_map._number_bombs = len(the_map._bombs)
-        init_coords = ((x, y), theta)
         the_map.playground.add(bomb, init_coords)
         bomb.add_pose_to_path(Pose(np.array([x, y])))
 

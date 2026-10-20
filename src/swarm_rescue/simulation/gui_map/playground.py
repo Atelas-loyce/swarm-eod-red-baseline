@@ -888,6 +888,54 @@ class Playground:
 
         return bool(overlaps)
 
+    def overlaps_collision_type(
+            self,
+            entity: EmbodiedEntity,
+            coordinates,
+            collision_type: int,
+    ) -> bool:
+        """
+        Test whether an entity placed at the given coordinates would touch a
+        shape of the given collision type, ignoring every other shape.
+
+        This is how a bomb is refused when it would start on the disposal
+        center: the disposal happens by contact, so such a bomb is disposed by
+        the first physics step and never becomes a bomb the round can rescue.
+
+        Args:
+            entity (EmbodiedEntity): The entity to test.
+            coordinates: (position, angle) where the entity would be placed.
+            collision_type (int): Collision type to look for.
+
+        Returns:
+            bool: True if a shape of that type would be hit.
+        """
+        dummy_body = pymunk.Body(body_type=pymunk.Body.STATIC)
+        dummy_shapes = []
+        for pm_shape in entity.pm_shapes:
+            dummy_shape = pm_shape.copy()
+            dummy_shape.body = dummy_body
+            dummy_shape.sensor = True
+            dummy_shapes.append(dummy_shape)
+
+        self.space.add(dummy_body, *dummy_shapes)
+
+        dummy_body.position, dummy_body.angle = coordinates
+        self.space.reindex_static()
+
+        overlaps = []
+        for dummy_shape in dummy_shapes:
+            overlaps += self.space.shape_query(dummy_shape)
+
+        self.space.remove(dummy_body, *dummy_shapes)
+        self.space.reindex_static()
+
+        return any(
+            info.shape is not None
+            and info.shape.collision_type == collision_type
+            for info in overlaps
+        )
+
     def get_closest_agent(self, entity: EmbodiedEntity) -> Agent:
         """
         Get the closest agent to a given entity.

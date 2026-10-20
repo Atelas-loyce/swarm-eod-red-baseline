@@ -64,6 +64,12 @@ class DisposalCenter(PhysicalElement):
         if self._playground is None:
             raise ValueError("DisposalCenter is not associated with a playground.")
 
+        # One activation per bomb: a repeat contact report for the same bomb
+        # must not reward it twice.
+        if entity.disposed:
+            return
+        entity.disposed = True
+
         grasped_by_list = entity.grasped_by.copy()
         grasped_by_size = len(entity.grasped_by)
 

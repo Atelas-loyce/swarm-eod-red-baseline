@@ -52,6 +52,12 @@ class Bomb(PhysicalElement):
         self.disposal_center = disposal_center
         self.graspable = True
 
+        # Set once the bomb reaches its disposal center. A disposed bomb is
+        # detached from the playground but kept in the map's bomb list (the
+        # round's total is fixed when the round starts), so this flag is what
+        # distinguishes "already disposed" from "still to rescue".
+        self.disposed = False
+
         self.forward_controller = CenteredContinuousController(name="forward")
         self.add_device(self.forward_controller)
 
@@ -69,6 +75,10 @@ class Bomb(PhysicalElement):
     @property
     def _collision_type(self) -> int:
         return CollisionTypes.BOMB
+
+    def reset(self) -> None:
+        """A bomb re-added to the playground by a reset is live again."""
+        self.disposed = False
 
     @property
     def reward(self) -> float:
