@@ -52,7 +52,13 @@ FORBIDDEN_ZIP_BASENAMES = frozenset({
     "launcher.py",
 })
 
-# Bundled weights are allowed for deep-learning submissions (see submission_guidelines.md).
+# Bundled weights are allowed for deep-learning submissions (see the packaged-
+# weight rules in doc/participants/03-提交检查与打包.md). The submission
+# installer keeps the same tuple so a file this check tolerates is a file it
+# actually ships into solutions/; tests/test_submission_installer.py pins the two
+# copies together, which is why this one stays duplicated rather than imported.
+# This file is renamed into the participant tree by scripts/build_public_branch.sh
+# and the installer module is organizer-only there, so importing it would break.
 MODEL_WEIGHT_SUFFIXES = (
     ".pth",
     ".pt",
@@ -607,12 +613,13 @@ def scan_submission_python_sources(
         )
 
 
+def _is_model_weight(name: str) -> bool:
+    """True when *name* carries one of the allowed model-weight suffixes."""
+    return name.replace("\\", "/").lower().endswith(MODEL_WEIGHT_SUFFIXES)
+
+
 def _zip_has_model_weights(names: set) -> bool:
-    for entry in names:
-        lower = entry.replace("\\", "/").lower()
-        if any(lower.endswith(suffix) for suffix in MODEL_WEIGHT_SUFFIXES):
-            return True
-    return False
+    return any(_is_model_weight(entry) for entry in names)
 
 
 def _check_zip_entries(names: set, result: SubmissionCheckResult, zip_path: Path) -> None:
@@ -650,9 +657,7 @@ def _check_zip_entries(names: set, result: SubmissionCheckResult, zip_path: Path
                     continue
                 if info.file_size <= LARGE_FILE_WARN_BYTES:
                     continue
-                norm = info.filename.replace("\\", "/").lower()
-                is_weight = any(norm.endswith(suffix) for suffix in MODEL_WEIGHT_SUFFIXES)
-                if is_weight:
+                if _is_model_weight(info.filename):
                     continue
                 result.add_warning(
                     f"Large non-model file in zip ({info.filename}, "
