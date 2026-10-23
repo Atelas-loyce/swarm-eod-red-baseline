@@ -342,8 +342,15 @@ class GuiSR(TopDownView):
         self._elapsed_timestep += 1
 
         if self._elapsed_timestep < 2:
-            self._playground.step(all_commands=self._drones_commands,
-                                  all_messages=self._messages)
+            # Warm-up step: the solution's control() is not called yet, but the
+            # physics still applies, so a bomb that already touches the
+            # disposal center is disposed here. `Agent.pre_step` zeroes the
+            # per-step rewards before the next step, so this step's rewards are
+            # the only record that the disposal happened -- they must reach the
+            # round's counter or the bomb is lost to the score.
+            _, rewards = self._playground.step(all_commands=self._drones_commands,
+                                               all_messages=self._messages)
+            self._update_disposal_progress(self._rewards_total(rewards))
             # self._the_map.explored_map.update(self._drones)
             # self._the_map.explored_map._process_positions()
             # self._the_map.explored_map.display()
@@ -378,8 +385,8 @@ class GuiSR(TopDownView):
             if self._drones:
                 self._drones[0].display()
 
-            self._playground.step(all_commands=self._drones_commands,
-                                  all_messages=self._messages)
+            _, rewards = self._playground.step(all_commands=self._drones_commands,
+                                               all_messages=self._messages)
 
             # self._playground.debug_draw()
 
@@ -387,11 +394,7 @@ class GuiSR(TopDownView):
             # self._the_map.explored_map.display()
 
             # REWARDS
-            new_reward = 0
-            for i in range(self._number_drones):
-                new_reward += self._drones[i].reward
-
-            self._update_disposal_progress(new_reward)
+            self._update_disposal_progress(self._rewards_total(rewards))
 
         last_timestamp = time.time()
         # last_elapsed_walltime = self._elapsed_walltime
@@ -457,6 +460,13 @@ class GuiSR(TopDownView):
                 )
             self._last_image = self.get_playground_image()
             arcade.close_window()
+
+    @staticmethod
+    def _rewards_total(rewards: Optional[dict]) -> float:
+        """Sum the rewards a single step granted to the playground's agents."""
+        if not rewards:
+            return 0.0
+        return float(sum(rewards.values()))
 
     def _update_disposal_progress(self, new_reward: int) -> None:
         """Update disposal counters and stop once all bombs are disposed."""

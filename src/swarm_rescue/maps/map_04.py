@@ -44,8 +44,8 @@ class Map04(MapAbstract):
         # 无人机出生区域中心点
         self._start_area_drones = (-232, -463)
 
-        self._disposal_center = DisposalCenter(size=(246, 152))
-        self._disposal_center_pos = ((13, -472), 0)
+        self._disposal_center = DisposalCenter(size=(246, 160))
+        self._disposal_center_pos = ((13, -476), 0)
 
         self._bombs_pos = []
         self._bombs_path = []

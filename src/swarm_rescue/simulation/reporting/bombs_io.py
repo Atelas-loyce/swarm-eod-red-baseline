@@ -87,10 +87,18 @@ def validate_bombs_file_for_eval(
 
 
 def bombs_to_serializable(the_map) -> List[Dict[str, Any]]:
-    """Collect current bomb positions from a map instance."""
+    """Collect the bomb positions delivered to the blue team.
+
+    A bomb disposed during the round keeps its seat in the map's ``_bombs``
+    list (the round's total is fixed when the round starts), and its last
+    position is the contact point with the disposal center. That is not a
+    placement the blue team can rescue, so disposed bombs are left out.
+    """
     entries = []
     bombs = getattr(the_map, "_bombs", None) or []
     for bomb in bombs:
+        if bomb.disposed:
+            continue
         pos = bomb.true_position()
         entries.append({
             "x": float(pos[0]),

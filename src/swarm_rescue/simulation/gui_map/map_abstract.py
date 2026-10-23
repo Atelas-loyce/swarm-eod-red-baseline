@@ -9,6 +9,7 @@ from swarm_rescue.simulation.gui_map.playground import Playground
 from swarm_rescue.simulation.reporting.evaluation import ZonesConfig
 from swarm_rescue.simulation.reporting.explored_map import ExploredMap
 from swarm_rescue.simulation.utils.constants import DRONE_INITIAL_HEALTH
+from swarm_rescue.simulation.utils.definitions import CollisionTypes
 from swarm_rescue.simulation.utils.pose import Pose
 
 
@@ -57,8 +58,19 @@ class MapAbstract(ABC):
 
     @property
     def bombs(self) -> List[Bomb]:
-        """Bombs currently on the playground."""
+        """Every bomb spawned on this map, including the ones already disposed."""
         return self._bombs
+
+    @property
+    def live_bombs(self) -> List[Bomb]:
+        """Bombs that have not been disposed.
+
+        `DisposalCenter.activate` detaches a disposed bomb from the playground
+        but leaves it in `bombs`, because the round's total is fixed when the
+        round starts. Use this view for anything that describes what is left
+        to rescue (or what a red round actually delivered).
+        """
+        return [bomb for bomb in self._bombs if not bomb.disposed]
 
     @property
     def disposal_center(self):
@@ -81,6 +93,7 @@ class MapAbstract(ABC):
         self,
         bomb_entries: List[Dict[str, Any]],
         disposal_center=None,
+        refuse_overlapping_disposal_center: bool = True,
     ) -> None:
         """
         Spawn bombs from normalized entry dicts (x, y, theta, optional path).
@@ -88,6 +101,11 @@ class MapAbstract(ABC):
         Args:
             bomb_entries: List of dicts with keys x, y, theta, optional path.
             disposal_center: DisposalCenter instance; defaults to map's center.
+            refuse_overlapping_disposal_center: Skip entries that would spawn
+                in contact with the disposal center. Such a bomb is disposed by
+                the first physics step, so it never becomes a bomb the round
+                can search for and rescue. Pass False for placeholder spawns
+                that are repositioned right away (replay).
         """
         if self._playground is None:
             raise ValueError("Cannot spawn bombs: playground is not initialized.")
@@ -103,9 +121,18 @@ class MapAbstract(ABC):
             x = float(entry["x"])
             y = float(entry["y"])
             theta = float(entry.get("theta", 0.0))
-            bomb = Bomb(disposal_center=center)
-            self._bombs.append(bomb)
             init_pos = ((x, y), theta)
+            bomb = Bomb(disposal_center=center)
+            if (refuse_overlapping_disposal_center
+                    and self._playground.overlaps_collision_type(
+                        bomb, init_pos, CollisionTypes.DISPOSAL_CENTER)):
+                print(
+                    f"Warning: bomb at ({x:.1f}, {y:.1f}) is on the disposal "
+                    "center and is not spawned: it would be disposed before "
+                    "the round can rescue it."
+                )
+                continue
+            self._bombs.append(bomb)
             self._playground.add(bomb, init_pos)
             bomb.add_pose_to_path(Pose(np.array(init_pos[0])))
             path = entry.get("path")

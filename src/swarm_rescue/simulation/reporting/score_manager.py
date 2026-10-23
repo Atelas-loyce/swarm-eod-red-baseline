@@ -74,13 +74,17 @@ class ScoreManager:
         """
         Compute the final score out of 100.
 
-        The time score uses the same convention as the red team
+        The time score is awarded only to a round that disposed every bomb; a
+        round that leaves bombs behind earns 0 on time whatever ended it. It
+        may run to the timestep limit (``elapsed_timestep`` at the limit) or,
+        on a host slow enough to reach the walltime limit first, stop below the
+        limit; the completion gate holds both at 0, so the time score never
+        rewards an incomplete round and never depends on host speed.
+
+        A completed round uses the same curve as the red team
         (``PlaceScoreManager.compute_time_score``): at or before half the
-        timestep limit it is full (out of 100), it drops to 0 at the limit and
-        is linear in between; a crashed round earns 0 on time. The rescue round
-        ends as soon as all bombs are disposed, so ``elapsed_timestep`` equals
-        the disposal-completion timestep for completing runs and reaches the
-        limit for incomplete ones.
+        timestep limit the score is full (out of 100), it drops to 0 at the
+        limit and is linear in between; a crashed round earns 0 on time.
 
         Args:
             number_disposed_bombs (int): Number of disposed bombs.
@@ -99,7 +103,15 @@ class ScoreManager:
         else:
             percentage_disposed = 100.0
 
-        score_timestep = self._compute_time_score(elapsed_timestep, has_crashed)
+        all_bombs_disposed = (
+            self.total_number_bombs <= 0
+            or number_disposed_bombs >= self.total_number_bombs
+        )
+        if all_bombs_disposed:
+            score_timestep = self._compute_time_score(elapsed_timestep,
+                                                      has_crashed)
+        else:
+            score_timestep = 0.0
 
         score = self.w_disposal * percentage_disposed + \
                 self.w_exploration * score_exploration + \
@@ -111,14 +123,14 @@ class ScoreManager:
     def _compute_time_score(self, elapsed_timestep: int,
                             has_crashed: bool = False) -> float:
         """
-        Time score out of 100, mirroring the red team's time score.
+        Time score out of 100 for a round that disposed every bomb, mirroring
+        the red team's time score.
 
         ``score_timestep = clamp((limit - elapsed) / (limit - best), 0, 1) * 100``
         where ``limit = max_timestep_limit`` and ``best = time_best_ratio *
-        limit`` (default half the limit). There is no completion gate: a round
-        that does not dispose all bombs only ends when the limit is reached, so
-        its ``elapsed_timestep`` is at the limit and the time score is 0. A
-        crashed round earns 0, same as the red team.
+        limit`` (default half the limit). A crashed round earns 0, same as the
+        red team. The completion gate lives in ``compute_score``, which is the
+        only caller and applies this curve only to a round with no bomb left.
         """
         if has_crashed:
             return 0.0

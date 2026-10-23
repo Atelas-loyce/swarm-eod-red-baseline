@@ -29,37 +29,37 @@ def add_boxes(playground):
 
 def add_walls(playground):
     # wall 0
-    wall = NormalWall(pos_start=(-821, 551),
-                      pos_end=(-821, -554))
+    wall = NormalWall(pos_start=(-827, 558),
+                      pos_end=(-827, -558))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 1
-    wall = NormalWall(pos_start=(-532, 550),
+    wall = NormalWall(pos_start=(-532, 558),
                       pos_end=(-532, 352))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 2
-    wall = NormalWall(pos_start=(-126, 552),
+    wall = NormalWall(pos_start=(-126, 558),
                       pos_end=(-126, 333))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 3
-    wall = NormalWall(pos_start=(822, 550),
-                      pos_end=(822, -553))
+    wall = NormalWall(pos_start=(827, 558),
+                      pos_end=(827, -558))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 4
-    wall = NormalWall(pos_start=(-530, 551),
+    wall = NormalWall(pos_start=(-530, 558),
                       pos_end=(-530, 353))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 5
-    wall = NormalWall(pos_start=(-820, 550),
-                      pos_end=(824, 550))
+    wall = NormalWall(pos_start=(-827, 558),
+                      pos_end=(827, 558))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 6
-    wall = NormalWall(pos_start=(-128, 549),
+    wall = NormalWall(pos_start=(-128, 558),
                       pos_end=(-128, 334))
     playground.add(wall, wall.wall_coordinates)
 
@@ -79,12 +79,12 @@ def add_walls(playground):
     playground.add(wall, wall.wall_coordinates)
 
     # wall 10
-    wall = NormalWall(pos_start=(-821, 441),
+    wall = NormalWall(pos_start=(-827, 441),
                       pos_end=(-631, 441))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 11
-    wall = NormalWall(pos_start=(-821, 439),
+    wall = NormalWall(pos_start=(-827, 439),
                       pos_end=(-632, 439))
     playground.add(wall, wall.wall_coordinates)
 
@@ -114,12 +114,12 @@ def add_walls(playground):
     playground.add(wall, wall.wall_coordinates)
 
     # wall 17
-    wall = NormalWall(pos_start=(-821, 253),
+    wall = NormalWall(pos_start=(-827, 253),
                       pos_end=(-631, 253))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 18
-    wall = NormalWall(pos_start=(-821, 251),
+    wall = NormalWall(pos_start=(-827, 251),
                       pos_end=(-632, 251))
     playground.add(wall, wall.wall_coordinates)
 
@@ -174,22 +174,22 @@ def add_walls(playground):
     playground.add(wall, wall.wall_coordinates)
 
     # wall 29
-    wall = NormalWall(pos_start=(-821, 75),
+    wall = NormalWall(pos_start=(-827, 75),
                       pos_end=(-623, 75))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 30
-    wall = NormalWall(pos_start=(-821, 73),
+    wall = NormalWall(pos_start=(-827, 73),
                       pos_end=(-622, 73))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 31
-    wall = NormalWall(pos_start=(-821, -15),
+    wall = NormalWall(pos_start=(-827, -15),
                       pos_end=(-630, -15))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 32
-    wall = NormalWall(pos_start=(-821, -17),
+    wall = NormalWall(pos_start=(-827, -17),
                       pos_end=(-631, -17))
     playground.add(wall, wall.wall_coordinates)
 
@@ -234,18 +234,18 @@ def add_walls(playground):
     playground.add(wall, wall.wall_coordinates)
 
     # wall 41
-    wall = NormalWall(pos_start=(-821, -551),
-                      pos_end=(823, -551))
+    wall = NormalWall(pos_start=(-827, -558),
+                      pos_end=(827, -558))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 42
     wall = NormalWall(pos_start=(-623, -299),
-                      pos_end=(-816, -299))
+                      pos_end=(-827, -299))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 43
-    wall = NormalWall(pos_start=(-623, -296),
-                      pos_end=(-820, -296))
+    wall = NormalWall(pos_start=(-622, -296),
+                      pos_end=(-827, -296))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 44
@@ -254,12 +254,12 @@ def add_walls(playground):
     playground.add(wall, wall.wall_coordinates)
 
     # wall 45
-    wall = NormalWall(pos_start=(-818, -170),
+    wall = NormalWall(pos_start=(-827, -170),
                       pos_end=(-764, -170))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 46
-    wall = NormalWall(pos_start=(-818, -173),
+    wall = NormalWall(pos_start=(-827, -173),
                       pos_end=(-764, -173))
     playground.add(wall, wall.wall_coordinates)
 
@@ -270,7 +270,7 @@ def add_walls(playground):
 
     # wall 48
     wall = NormalWall(pos_start=(570, 311),
-                      pos_end=(820, 311))
+                      pos_end=(827, 311))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 49
@@ -279,17 +279,17 @@ def add_walls(playground):
     playground.add(wall, wall.wall_coordinates)
 
     # wall 50
-    wall = NormalWall(pos_start=(570, 74),
+    wall = NormalWall(pos_start=(570, 71),
                       pos_end=(570, 206))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 51
     wall = NormalWall(pos_start=(570, -109),
-                      pos_end=(817, -109))
+                      pos_end=(827, -109))
     playground.add(wall, wall.wall_coordinates)
 
     # wall 52
     wall = NormalWall(pos_start=(570, -303),
-                      pos_end=(570, -545))
+                      pos_end=(570, -558))
     playground.add(wall, wall.wall_coordinates)
 

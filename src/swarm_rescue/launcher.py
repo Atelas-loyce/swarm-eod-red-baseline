@@ -42,6 +42,7 @@ from swarm_rescue.maps.map_02 import Map02
 from swarm_rescue.maps.map_03 import Map03
 from swarm_rescue.maps.map_04 import Map04
 from swarm_rescue.maps.map_05 import Map05
+from swarm_rescue.maps.map_07 import Map07
 
 from swarm_rescue.solutions.my_drone_eval import drone_class_for_mode
 
@@ -465,6 +466,7 @@ class Launcher:
         placed_bombs_path = None
         remaining_inventory = 0
         place_phase1 = None
+        placed_bomb_count = the_map.number_bombs
         if round_team_mode == TeamMode.PLACE:
             remaining_inventory = sum(
                 d.carried_bombs_count() for d in the_map.drones
@@ -535,9 +537,14 @@ class Launcher:
             expected_bombs = (
                 the_map.number_drones * eval_config.initial_bombs_per_drone
             )
+            # Only bombs that were not disposed during the red round count as
+            # placed: a disposed bomb is not written to the bombs file, so it is
+            # not a bomb the blue team faces.
+            live_bombs = the_map.live_bombs
+            placed_bomb_count = len(live_bombs)
             bomb_positions = [
                 tuple(float(c) for c in bomb.true_position())
-                for bomb in (getattr(the_map, "_bombs", None) or [])
+                for bomb in live_bombs
             ]
             # Wall scoring/visualization use a walls-only grid built from the
             # map's real wall entities (captured before the playground cleanup
@@ -551,7 +558,7 @@ class Launcher:
                 elapsed_walltime=my_gui.elapsed_walltime,
                 max_walltime_limit=self.max_walltime_limit,
                 score_exploration_trajectory=score_exploration,
-                placed_count=the_map.number_bombs,
+                placed_count=placed_bomb_count,
                 expected_count=expected_bombs,
                 has_crashed=has_crashed,
                 bomb_positions=bomb_positions,
@@ -610,7 +617,7 @@ class Launcher:
                 my_gui.is_max_walltime_limit_reached,
                 has_crashed,
                 round_team_mode,
-                the_map.number_bombs,
+                placed_bomb_count,
                 placed_bombs_path,
                 remaining_inventory,
                 place_phase1)

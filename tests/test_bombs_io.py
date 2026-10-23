@@ -45,6 +45,7 @@ def test_load_and_roundtrip_bombs_file():
 
 def test_bombs_to_serializable_from_mock_bomb():
     bomb = MagicMock()
+    bomb.disposed = False
     bomb.true_position.return_value = np.array([1.5, -2.5])
     bomb.true_angle.return_value = 0.25
     bomb.path.length.return_value = 1
@@ -55,8 +56,28 @@ def test_bombs_to_serializable_from_mock_bomb():
     assert entries == [{"x": 1.5, "y": -2.5, "theta": 0.25}]
 
 
+def test_bombs_to_serializable_skips_disposed_bombs():
+    disposed = MagicMock()
+    disposed.disposed = True
+    disposed.true_position.return_value = np.array([-505.0, 199.6])
+    disposed.true_angle.return_value = 0.0
+    disposed.path.length.return_value = 1
+
+    delivered = MagicMock()
+    delivered.disposed = False
+    delivered.true_position.return_value = np.array([100.0, 200.0])
+    delivered.true_angle.return_value = 0.0
+    delivered.path.length.return_value = 1
+
+    the_map = MagicMock()
+    the_map._bombs = [disposed, delivered]
+    entries = bombs_to_serializable(the_map)
+    assert entries == [{"x": 100.0, "y": 200.0, "theta": 0.0}]
+
+
 def test_save_placed_bombs_writes_json():
     bomb = MagicMock()
+    bomb.disposed = False
     bomb.true_position.return_value = np.array([100.0, 200.0])
     bomb.true_angle.return_value = 1.0
     bomb.path.length.return_value = 0
@@ -91,6 +112,52 @@ def test_map_clear_and_spawn_bombs():
     assert the_map._bombs == []
     assert the_map._number_bombs == 0
     the_map._playground.remove.assert_called_once_with(bomb)
+
+
+class _FakeSpawnPlayground:
+    """Playground stub that reports a disposal center at chosen positions."""
+
+    def __init__(self, on_center):
+        self.on_center = set(on_center)
+        self.added = []
+
+    def overlaps_collision_type(self, entity, coordinates, collision_type):
+        return tuple(coordinates[0]) in self.on_center
+
+    def add(self, entity, initial_coordinates=None, **kwargs):
+        self.added.append((entity, tuple(initial_coordinates[0])))
+
+
+class _SpawnMap(MapAbstract):
+    def __init__(self, playground):
+        super().__init__(drone_type=MagicMock)
+        self._number_bombs = 0
+        self._playground = playground
+        self._disposal_center = _DummyDisposal()
+
+
+def test_spawn_bombs_skips_bombs_on_the_disposal_center():
+    playground = _FakeSpawnPlayground(on_center=[(-505.0, 302.0)])
+    the_map = _SpawnMap(playground)
+    the_map.spawn_bombs([
+        {"x": -505.0, "y": 302.0, "theta": 0.0},
+        {"x": 400.0, "y": 0.0, "theta": 0.0},
+    ])
+
+    assert the_map.number_bombs == 1
+    assert [coords for _, coords in playground.added] == [(400.0, 0.0)]
+
+
+def test_spawn_bombs_can_keep_placeholder_bombs_on_the_disposal_center():
+    playground = _FakeSpawnPlayground(on_center=[(0.0, 0.0)])
+    the_map = _SpawnMap(playground)
+    the_map.spawn_bombs(
+        [{"x": 0.0, "y": 0.0, "theta": 0.0}],
+        refuse_overlapping_disposal_center=False,
+    )
+
+    assert the_map.number_bombs == 1
+    assert len(playground.added) == 1
 
 
 def test_exploration_map_output_path_naming():

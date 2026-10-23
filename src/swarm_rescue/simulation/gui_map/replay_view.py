@@ -35,10 +35,12 @@ def run_replay(npz_path: str, map_class, map_kwargs_extra: dict = None):
 
     max_bombs = metadata.get("max_bombs", 0)
     if max_bombs > 0:
-        the_map.spawn_bombs([
-            {"x": 0.0, "y": 0.0, "theta": 0.0}
-            for _ in range(max_bombs)
-        ])
+        # Placeholder spawns: every bomb is moved to its recorded position
+        # right away, so they must not be filtered against the disposal center.
+        the_map.spawn_bombs(
+            [{"x": 0.0, "y": 0.0, "theta": 0.0} for _ in range(max_bombs)],
+            refuse_overlapping_disposal_center=False,
+        )
 
     view = TopDownView(
         playground,
