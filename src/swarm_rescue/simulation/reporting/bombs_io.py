@@ -572,8 +572,12 @@ def save_exploration_comparison_image(
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    if not cv2.imwrite(str(path), canvas):
+    # OpenCV's Windows file writer does not support every Unicode path.
+    # Encode the pixels in OpenCV and let pathlib handle the filesystem path.
+    ok, encoded = cv2.imencode(path.suffix, canvas)
+    if not ok:
         raise IOError(f"failed to write comparison image: {path}")
+    path.write_bytes(encoded.tobytes())
 
 
 # ---------------------------------------------------------------------------
@@ -820,5 +824,7 @@ def save_wall_destruction_image(
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    if not cv2.imwrite(str(path), canvas):
+    ok, encoded = cv2.imencode(path.suffix, canvas)
+    if not ok:
         raise IOError(f"failed to write wall-destruction image: {path}")
+    path.write_bytes(encoded.tobytes())

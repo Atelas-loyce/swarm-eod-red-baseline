@@ -408,7 +408,11 @@ class MyDronePlaceBaseline(DroneAbstract):
         for col, row in self._wall_set:
             x, y = col * self.WALL_BIN, row * self.WALL_BIN
             if 0 <= x < w and 0 <= y < h:
-                cv2.circle(grid, (x, y), 3, 1, -1)
+                # A confirmed bin represents a complete cell. Drawing circles
+                # leaves gaps between adjacent bins even on a continuous wall.
+                half = self.WALL_BIN // 2
+                grid[max(0, y - half):min(h, y - half + self.WALL_BIN),
+                     max(0, x - half):min(w, x - half + self.WALL_BIN)] = 1
         # The public size describes a ClosedPlayground with a 6 px wall frame.
         cv2.rectangle(grid, (2, 2), (w - 3, h - 3), 1, 5)
         print(f"[place-baseline] submit step={self._step}, walls={len(self._wall_set)}, "
