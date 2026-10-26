@@ -326,11 +326,20 @@ class Playground:
         """
         Returns the list of agents currently in the playground.
 
+        A plain ``remove()`` marks the entity removed without touching the
+        agent roster, so a cached list is only trusted while none of its agents
+        has become removed.
+
         Returns:
             List[Agent]: The agents.
         """
-        # Cache the result to avoid recalculating every time
-        if not hasattr(self, '_cached_agents') or self._agents_cache_needs_update:
+        # Cache the result to avoid rebuilding the list every time
+        cache_invalid = (
+            not hasattr(self, '_cached_agents')
+            or self._agents_cache_needs_update
+            or any(agent.removed for agent in self._cached_agents)
+        )
+        if cache_invalid:
             self._cached_agents = [agent for agent in self._agents if not agent.removed]
             self._agents_cache_needs_update = False
         return self._cached_agents

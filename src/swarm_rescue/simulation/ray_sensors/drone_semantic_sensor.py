@@ -187,11 +187,16 @@ class DroneSemanticSensor(SemanticSensor):
     def _apply_noise(self) -> None:
         """
         Applies noise to the semantic sensor values.
+
+        `_std_dev_noise` is the standard deviation of the distance noise, so it
+        goes in as `scale`: `np.random.normal` reads a single positional
+        argument as `loc`, which would shift every measurement by that amount
+        and leave a spread of one pixel.
         """
         for index, data in enumerate(self._values):
             new_data = self.Data(
                 distance=max(0.0, data.distance +
-                             np.random.normal(self._std_dev_noise)),
+                             np.random.normal(0.0, self._std_dev_noise)),
                 angle=data.angle,
                 entity_type=data.entity_type,
                 grasped=data.grasped)
