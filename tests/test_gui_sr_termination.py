@@ -1,17 +1,27 @@
 from swarm_rescue.simulation.gui_map.gui_sr import GuiSR
 
 
-class _PlaygroundStub:
-    """Playground stub whose step grants the given total reward."""
+class _BombStub:
+    """Bomb stub exposing the only field the round counts."""
 
-    def __init__(self, reward: float):
-        self.reward = reward
+    def __init__(self, disposed: bool = False):
+        self.disposed = disposed
+
+
+class _PlaygroundStub:
+    """Playground stub whose step disposes the given number of bombs."""
+
+    def __init__(self, bomb_count: int, dispose_on_step: int):
+        self.bombs = [_BombStub() for _ in range(bomb_count)]
+        self._dispose_on_step = dispose_on_step
 
     def step(self, all_commands=None, all_messages=None):
-        return None, {object(): self.reward}
+        for bomb in self.bombs[:self._dispose_on_step]:
+            bomb.disposed = True
+        return None, {}
 
 
-def _gui_for_warmup(total_bombs: int, reward: float):
+def _gui_for_warmup(total_bombs: int, dispose_on_step: int = 1):
     gui = object.__new__(GuiSR)
     gui._editing_locked = False
     gui._elapsed_timestep = 0
@@ -21,12 +31,18 @@ def _gui_for_warmup(total_bombs: int, reward: float):
     gui._disposed_number = 0
     gui._full_disposal_timestep = 0
     gui._terminate = False
-    gui._playground = _PlaygroundStub(reward)
+    gui._playground = _PlaygroundStub(total_bombs, dispose_on_step)
+    gui._the_map = _MapStub(gui._playground)
     return gui
 
 
+class _MapStub:
+    def __init__(self, playground):
+        self.bombs = playground.bombs
+
+
 def test_warmup_step_counts_the_bomb_it_disposed():
-    gui = _gui_for_warmup(total_bombs=3, reward=1.0)
+    gui = _gui_for_warmup(total_bombs=3, dispose_on_step=1)
 
     gui.on_update(0.03)
 
@@ -37,7 +53,7 @@ def test_warmup_step_counts_the_bomb_it_disposed():
 
 
 def test_warmup_step_completes_a_round_whose_bombs_all_start_on_the_center():
-    gui = _gui_for_warmup(total_bombs=1, reward=1.0)
+    gui = _gui_for_warmup(total_bombs=1, dispose_on_step=1)
 
     gui.on_update(0.03)
 
@@ -54,7 +70,8 @@ def test_update_disposal_progress_marks_termination_when_all_bombs_disposed():
     gui._elapsed_timestep = 42
     gui._terminate = False
 
-    gui._update_disposal_progress(new_reward=1)
+    # The round reports its running total of disposed bombs.
+    gui._update_disposal_progress(disposed_count=3)
 
     assert gui._disposed_number == 3
     assert gui._full_disposal_timestep == 42
@@ -69,7 +86,7 @@ def test_update_disposal_progress_does_not_terminate_before_completion():
     gui._elapsed_timestep = 42
     gui._terminate = False
 
-    gui._update_disposal_progress(new_reward=1)
+    gui._update_disposal_progress(disposed_count=3)
 
     assert gui._disposed_number == 3
     assert gui._full_disposal_timestep == 0

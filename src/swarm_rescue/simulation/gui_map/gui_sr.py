@@ -344,57 +344,60 @@ class GuiSR(TopDownView):
         if self._elapsed_timestep < 2:
             # Warm-up step: the solution's control() is not called yet, but the
             # physics still applies, so a bomb that already touches the
-            # disposal center is disposed here. `Agent.pre_step` zeroes the
-            # per-step rewards before the next step, so this step's rewards are
-            # the only record that the disposal happened -- they must reach the
-            # round's counter or the bomb is lost to the score.
-            _, rewards = self._playground.step(all_commands=self._drones_commands,
-                                               all_messages=self._messages)
-            self._update_disposal_progress(self._rewards_total(rewards))
+            # disposal center is disposed here. Nothing calls the round's
+            # progress recorder afterwards on this step, so it has to happen
+            # now or the disposal is lost to the score.
+            self._playground.step(all_commands=self._drones_commands,
+                                  all_messages=self._messages)
+            self._update_disposal_progress(self._disposed_bomb_count())
             # self._the_map.explored_map.update(self._drones)
             # self._the_map.explored_map._process_positions()
             # self._the_map.explored_map.display()
             return
 
-        self._the_map.explored_map.update_drones(self._drones)
+        # Drones whose health reached zero are removed from the playground;
+        # they must not be driven, heard from, nor keep exploring.
+        drivable_drones = self._drivable_drones()
+
+        self._the_map.explored_map.update_drones(drivable_drones)
         # self._the_map.explored_map._process_positions()
         # self._the_map.explored_map.display()
 
         # COMPUTE ALL THE MESSAGES
-        self._messages = self.collect_all_messages(self._drones)
+        self._messages = self.collect_all_messages(drivable_drones)
 
         # COMPUTE COMMANDS
-        for i in range(self._number_drones):
-            self._drones[i].elapsed_walltime = self._elapsed_walltime
-            self._drones[i].elapsed_timestep = self._elapsed_timestep
-            command = run_control(self._drones[i])
+        for i, drone in enumerate(drivable_drones):
+            drone.elapsed_walltime = self._elapsed_walltime
+            drone.elapsed_timestep = self._elapsed_timestep
+            command = run_control(drone)
             if self._use_keyboard and i == 0:
                 command = self._keyboardController.control()
 
-            self._drones_commands[self._drones[i]] = command
+            self._drones_commands[drone] = command
 
         # Early termination for red-team map submission.
         # We end the round before the next physics step is applied.
         exploration_submitted = any(
             getattr(drone, "_exploration_map_submission", None) is not None
-            for drone in self._drones
+            for drone in drivable_drones
         )
         if exploration_submitted:
             self._terminate = True
         else:
-            if self._drones:
-                self._drones[0].display()
+            if drivable_drones:
+                drivable_drones[0].display()
 
-            _, rewards = self._playground.step(all_commands=self._drones_commands,
-                                               all_messages=self._messages)
+            self._playground.step(all_commands=self._drones_commands,
+                                  all_messages=self._messages)
 
             # self._playground.debug_draw()
 
             self._visu_noises.update(enable=self._enable_visu_noises)
             # self._the_map.explored_map.display()
 
-            # REWARDS
-            self._update_disposal_progress(self._rewards_total(rewards))
+            # BOMBS DISPOSED THIS STEP
+            self._update_disposal_progress(self._disposed_bomb_count())
 
         last_timestamp = time.time()
         # last_elapsed_walltime = self._elapsed_walltime
@@ -458,24 +461,58 @@ class GuiSR(TopDownView):
                 self._state_recorder.save(
                     self._filename_state_recording, metadata
                 )
+            # Closing the round is real work (health stats, encoder flush,
+            # NPZ compression); the round's reading is re-taken afterwards so
+            # the limit judges everything the round actually spent.
+            self._sample_walltime_after_round_close(time.time)
             self._last_image = self.get_playground_image()
             arcade.close_window()
 
-    @staticmethod
-    def _rewards_total(rewards: Optional[dict]) -> float:
-        """Sum the rewards a single step granted to the playground's agents."""
-        if not rewards:
-            return 0.0
-        return float(sum(rewards.values()))
+    def _sample_walltime_after_round_close(self, clock=None) -> None:
+        """Re-take the round's wall-clock reading after the round closed.
 
-    def _update_disposal_progress(self, new_reward: int) -> None:
-        """Update disposal counters and stop once all bombs are disposed."""
-        if new_reward != 0:
-            self._disposed_number += new_reward
+        `on_update` samples the clock before the recording work at the end of a
+        round, so a save that runs long would otherwise be invisible to the
+        round limit. The reading is measured from the round's start timestamp
+        and clamped to the limit, exactly like the mid-round sample.
+        """
+        now = clock() if clock is not None else time.time()
+        elapsed = max(now - self._start_timestamp, self._elapsed_walltime)
+
+        if elapsed > self._max_walltime_limit:
+            elapsed = self._max_walltime_limit
+            self._is_max_walltime_limit_reached = True
+
+        self._elapsed_walltime = elapsed
+
+    def _disposed_bomb_count(self) -> int:
+        """Number of bombs this round has disposed, read from the map state.
+
+        A bomb disposed while several drones grasp it splits its reward across
+        them, so the round's progress cannot be summed from rewards: ten shares
+        of 0.1 add up to 9.999999999999998 and the completion gate would never
+        fire. `Bomb.disposed` is set once per bomb by
+        `DisposalCenter.activate`, so counting it is exact.
+        """
+        return sum(1 for bomb in self._the_map.bombs if bomb.disposed)
+
+    def _update_disposal_progress(self, disposed_count: int) -> None:
+        """Record the round's running count of disposed bombs.
+
+        ``disposed_count`` is the total so far, not an increment: the round
+        reads it from the map's bomb state, which cannot drift the way summed
+        rewards do. The counter never moves backwards, and caps at the round's
+        bomb total so a repeated report cannot end the round early.
+        """
+        if disposed_count:
+            self._disposed_number = min(
+                self._total_number_bombs,
+                max(self._disposed_number, int(disposed_count)),
+            )
 
         if (
             self._total_number_bombs > 0
-            and self._disposed_number == self._total_number_bombs
+            and self._disposed_number >= self._total_number_bombs
         ):
             if self._full_disposal_timestep == 0:
                 self._full_disposal_timestep = self._elapsed_timestep
@@ -705,16 +742,27 @@ class GuiSR(TopDownView):
         Collect messages from all drones.
 
         Args:
-            drones (List[DroneAbstract]): List of drones.
+            drones (List[DroneAbstract]): List of drones that are still in the
+                round, i.e. the result of `_drivable_drones`.
 
         Returns:
             AllSentMessagesDict: Dictionary of messages for each drone.
         """
         messages: AllSentMessagesDict = {}
-        for i in range(self._number_drones):
-            msg_data = drones[i].define_message_for_all()
-            messages[drones[i]] = {drones[i].communicator: (None, msg_data)}
+        for drone in drones:
+            msg_data = drone.define_message_for_all()
+            messages[drone] = {drone.communicator: (None, msg_data)}
         return messages
+
+    def _drivable_drones(self) -> List[DroneAbstract]:
+        """The drones the round still drives, in their original order.
+
+        `GuiSR._drones` is the round's full roster: a drone that ran out of
+        health is removed from the playground but stays in that list, so every
+        consumer of the roster must filter on `removed` -- otherwise a destroyed
+        drone keeps receiving `control()` calls and keeps transmitting.
+        """
+        return [drone for drone in self._drones if not drone.removed]
 
     def _screen_to_world(self, x: int, y: int) -> Tuple[float, float]:
         world_x = (x - self.width / 2) / self.zoom + self.center[0]
@@ -811,12 +859,16 @@ class GuiSR(TopDownView):
     def compute_health_stats(self) -> None:
         """
         Compute statistics about drone health and destruction.
+
+        A destroyed drone leaves ``playground.agents``, so its health is no
+        longer in that list. It still counts as a drone of the round at zero
+        health -- otherwise losing a drone would raise the round's mean health.
         """
         sum_health = 0
         for drone in self._playground.agents:
             sum_health += drone.drone_health
 
-        nb_destroyed = self._number_drones - len(self._playground.agents)
+        nb_destroyed = len(self._drones) - len(self._playground.agents)
 
         if self._number_drones > 0:
             self._mean_drones_health = sum_health / self._number_drones

@@ -10,6 +10,11 @@ LINEAR_SPEED_RATIO_BOMB: float = 1.0
 
 DRONE_INITIAL_HEALTH: int = 50
 
+# Simulated seconds between two collision damage ticks.  The cooldown is
+# simulation time (round timesteps), never wall time: a round replayed as fast
+# as the CPU allows must drain the same health as one played at 30 steps/s.
+COLLISION_COOLDOWN_SECONDS: float = 1.0
+
 RESOLUTION_SEMANTIC_SENSOR: int = 35
 MAX_RANGE_SEMANTIC_SENSOR: int = 200
 FOV_SEMANTIC_SENSOR: int = 360

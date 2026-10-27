@@ -24,11 +24,21 @@ from swarm_rescue.simulation.elements.normal_wall import NormalWall, NormalBox
 from swarm_rescue.simulation.elements.physical_element import PhysicalElement
 from swarm_rescue.simulation.gui_map.collision_handlers import get_colliding_entities
 from swarm_rescue.simulation.gui_map.playground import Playground
-from swarm_rescue.simulation.utils.constants import DRONE_INITIAL_HEALTH, RANGE_COMMUNICATION
+from swarm_rescue.simulation.utils.constants import (
+    COLLISION_COOLDOWN_SECONDS,
+    DRONE_INITIAL_HEALTH,
+    FRAME_RATE,
+    RANGE_COMMUNICATION,
+)
 from swarm_rescue.simulation.utils.misc_data import MiscData
-from swarm_rescue.simulation.utils.timer import Timer
 from swarm_rescue.simulation.drone.ground_truth_guard import assert_ground_truth_allowed
 from swarm_rescue.simulation.utils.utils import normalize_angle
+
+# Collision cooldown, in round timesteps (``FRAME_RATE`` is the inverse of the
+# simulation's steps per second).
+COLLISION_COOLDOWN_STEPS = max(
+    1, int(round(COLLISION_COOLDOWN_SECONDS / FRAME_RATE))
+)
 
 
 def drone_collision_wall(arbiter: pymunk.Arbiter, _, data) -> bool:
@@ -128,7 +138,8 @@ class DroneAbstract(Agent):
         _should_display_lidar_graph (bool): Whether to display lidar data with matplotlib.
         size_area (tuple): The size of the area in which the drone operates.
         communicator (Communicator): The communicator object for inter-drone communication.
-        _timer_collision_wall_or_drone (Timer): Timer for collision events.
+        _last_collision_damage_timestep (Optional[int]): Timestep of the
+            last collision damage tick; the cooldown is simulated time.
         _drone_health (int): Health of the drone, reduced on collisions.
         is_inside_return_area (bool): Whether the drone is inside the return area.
         elapsed_timestep (int): Number of timesteps since the beginning.
@@ -211,7 +222,8 @@ class DroneAbstract(Agent):
             self._curve = self._plot.plot(angles, distances, pen='g', symbol='o')
             self._win.show()
 
-        self._timer_collision_wall_or_drone = Timer(start_now=True)
+        # Timestep of the last collision tick; None before the first one.
+        self._last_collision_damage_timestep: Optional[int] = None
         self._drone_health = DRONE_INITIAL_HEALTH
 
         self.is_inside_return_area = False
@@ -746,37 +758,48 @@ class DroneAbstract(Agent):
                               font_size)
         id_text.draw()
 
-    def collide_wall(self) -> None:
+    def _collision_damage_allowed(self) -> bool:
         """
-        Handle collision with walls and reduce drone health.
+        Whether a collision may cost health on the current timestep.
+
+        The cooldown is measured in simulated time, not wall time: a round
+        replayed as fast as the CPU allows must drain the same health as one
+        played at the nominal frame rate.
         """
-        if self._timer_collision_wall_or_drone.get_elapsed_time() > 1.0:
-            self._drone_health -= 1
-            self._timer_collision_wall_or_drone.restart()
-            # print("Drone {} collides a wall, drone_health = {}"
-            # .format(self.identifier, self._drone_health))
+        if self._last_collision_damage_timestep is None:
+            return True
+
+        cooldown_steps = COLLISION_COOLDOWN_STEPS
+        return (
+            self.elapsed_timestep - self._last_collision_damage_timestep
+            >= cooldown_steps
+        )
+
+    def _apply_collision_damage(self) -> None:
+        """Take one point of collision damage and remove the drone at zero."""
+        if not self._collision_damage_allowed():
+            return
+
+        self._drone_health -= 1
+        self._last_collision_damage_timestep = self.elapsed_timestep
 
         if self._drone_health <= 0:
             print(f"Drone {self.identifier} destroyed, too much collision !")
             if not self.removed:
                 self.grasper._release_grasping()
-                self._playground.remove(self)
+                self._playground.remove(self, definitive=True)
+
+    def collide_wall(self) -> None:
+        """
+        Handle collision with walls and reduce drone health.
+        """
+        self._apply_collision_damage()
 
     def collide_drone(self) -> None:
         """
         Handle collision with other drones and reduce drone health.
         """
-        if self._timer_collision_wall_or_drone.get_elapsed_time() > 1.0:
-            self._drone_health -= 1
-            self._timer_collision_wall_or_drone.restart()
-            # print("Drone {} collides a drone, drone_health = {}"
-            # .format(self.identifier,self._drone_health))
-
-        if self._drone_health <= 0:
-            print(f"Drone {self.identifier} destroyed, too much collision !")
-            if not self.removed:
-                self.grasper._release_grasping()
-                self._playground.remove(self)
+        self._apply_collision_damage()
 
     def pre_step(self) -> None:
         """
