@@ -17,9 +17,9 @@ $env:PYTHONDONTWRITEBYTECODE='1'
 python -m swarm_rescue.launcher --headless --competition -c config/competition_place_eval_plan.yml
 ```
 
-红方入口是 `src/swarm_rescue/solutions/my_drone_eval.py`，当前选择 `MyDronePlaceBaseline`；策略实现在 `src/swarm_rescue/solutions/my_drone_place_baseline.py`。Map01、Map02、Map03 的本地成绩和已知问题见 [`PROGRESS.md`](PROGRESS.md)。
+红方入口是 `src/swarm_rescue/solutions/my_drone_eval.py`，当前选择 `MyDronePlaceBaseline`；策略实现在 `src/swarm_rescue/solutions/my_drone_place_baseline.py`。v04 已加入存活机接力提交；Map01、Map03、Map04、Map07 的同种子对照和损毁测试见 [`PROGRESS.md`](PROGRESS.md)。
 
-正式参赛前须把 `src/swarm_rescue/solutions/team_info.yml` 中的官方示例队伍信息改为真实信息，并运行 `python scripts/check_submission.py`。
+正式参赛前须把 `src/swarm_rescue/solutions/team_info.yml` 中的示例队名、成员改为真实信息，并运行 `python scripts/check_submission.py`。`team_number` 保持官方默认整数；不要填入字母数字分享码，平台会分配队伍 ID。公开仓库保留示例个人信息，本地提交包使用真实信息。
 
 ## 比赛任务与评分
 

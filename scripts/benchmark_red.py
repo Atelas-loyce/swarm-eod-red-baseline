@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import platform
 import random
+import subprocess
 import sys
 
 import numpy as np
@@ -20,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from swarm_rescue.launcher import Launcher
+from swarm_rescue.simulation.reporting.bombs_io import exploration_map_output_path
 
 
 def main():
@@ -39,6 +41,9 @@ def main():
         "python": platform.python_version(),
         "config": str(args.config.resolve()),
         "strategy_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        "engine_commit": subprocess.check_output(
+            ["git", "log", "-1", "--format=%H", "--", "src/swarm_rescue/simulation"],
+            cwd=ROOT, text=True).strip(),
         "competition_mode": True,
         "rounds": [],
     }
@@ -58,6 +63,10 @@ def main():
             np.random.seed(seed)
             gc.collect()
             print(f"BENCHMARK START map={scenario.map_name} seed={seed}", flush=True)
+            exploration_path = Path(exploration_map_output_path(
+                launcher.result_path, launcher.team_info, scenario, 1))
+            if exploration_path.exists():
+                raise FileExistsError(f"Refusing to reuse {exploration_path}")
             result = launcher.one_round(
                 scenario, 1, headless=True, competition_mode=True)
             if result is None or len(result) != 15 or result[-1] is None:
@@ -75,9 +84,11 @@ def main():
                 "crashed": result[9],
                 "placed": result[11],
                 "inventory": result[13],
+                "map_submitted": exploration_path.is_file(),
                 "scores": asdict(result[14]),
             }
-            failed |= bool(row["crashed"] or row["inventory"])
+            failed |= bool(row["crashed"] or row["inventory"] or
+                           row["walltime_limit_reached"] or not row["map_submitted"])
             report["rounds"].append(row)
             summary.write_text(json.dumps(report, ensure_ascii=False, indent=2),
                                encoding="utf-8")
