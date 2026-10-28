@@ -440,10 +440,19 @@ class MyDronePlaceBaseline(DroneAbstract):
         # Recently fused maps accumulate thick noisy edges. Trim their outer
         # pixel, but preserve sparse single-drone maps after radio loss. A
         # received wall message is evidence of fusion, not a quality guarantee.
-        if self._step - self._last_peer_map_step < self.SUBMIT_PEER_TTL:
+        recent_fusion = self._step - self._last_peer_map_step < self.SUBMIT_PEER_TTL
+        if recent_fusion:
             grid = cv2.erode(grid, np.ones((3, 3), dtype=np.uint8))
         # The public size describes a ClosedPlayground with a 6 px wall frame.
         cv2.rectangle(grid, (2, 2), (w - 3, h - 3), 1, 5)
+        if recent_fusion:
+            # A disconnected remnant smaller than one original wall cell is
+            # weak support after erosion. Keep diagonal wall connections and
+            # the known frame, while dropping these small noisy islands.
+            _, labels, stats, _ = cv2.connectedComponentsWithStats(grid, connectivity=8)
+            keep = stats[:, cv2.CC_STAT_AREA] >= self.WALL_BIN ** 2
+            keep[0] = False
+            grid = keep[labels].astype(np.uint8)
         print(f"[place-baseline] submit id={self.identifier}, step={self._step}, walls={len(self._wall_set)}, "
               f"inventory={self.carried_bombs_count()}, peers={len(self._peer)}, "
               f"done={len(self._completed)}/{count}")
