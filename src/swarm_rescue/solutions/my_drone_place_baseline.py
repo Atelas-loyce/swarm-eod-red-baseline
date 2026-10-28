@@ -453,6 +453,15 @@ class MyDronePlaceBaseline(DroneAbstract):
             keep = stats[:, cv2.CC_STAT_AREA] >= self.WALL_BIN ** 2
             keep[0] = False
             grid = keep[labels].astype(np.uint8)
+            # Fill only enclosed gaps no larger than one observed wall bin.
+            # Border-connected free space and larger rooms stay untouched.
+            _, holes, hole_stats, _ = cv2.connectedComponentsWithStats(
+                1 - grid, connectivity=8)
+            fill = hole_stats[:, cv2.CC_STAT_AREA] <= self.WALL_BIN ** 2
+            fill[0] = False
+            border = np.concatenate((holes[0], holes[-1], holes[:, 0], holes[:, -1]))
+            fill[np.unique(border)] = False
+            grid |= fill[holes].astype(np.uint8)
         print(f"[place-baseline] submit id={self.identifier}, step={self._step}, walls={len(self._wall_set)}, "
               f"inventory={self.carried_bombs_count()}, peers={len(self._peer)}, "
               f"done={len(self._completed)}/{count}")
