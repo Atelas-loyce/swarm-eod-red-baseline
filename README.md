@@ -21,6 +21,8 @@ python -m swarm_rescue.launcher --headless --competition -c config/competition_p
 
 正式参赛前须把 `src/swarm_rescue/solutions/team_info.yml` 中的示例队名、成员改为真实信息，并运行 `python scripts/check_submission.py`。`team_number` 保持官方默认整数；不要填入字母数字分享码，平台会分配队伍 ID。公开仓库保留示例个人信息，本地提交包使用真实信息。
 
+禁区验证须检查实际实体和失效计数：当前 Map03 只保存计划中的 `zones_config`，没有据此创建禁区。普通报表中的禁区名称仅代表配置声明。使用 `scripts/benchmark_red_completion.py` 可记录实际区域数与禁用步数；显式注入区域的压力实验与普通计划成绩应分别记录，详见进度中的更正。
+
 ## 比赛任务与评分
 
 同一个启动器通过 `team_mode` 区分任务：
