@@ -17,7 +17,7 @@ $env:PYTHONDONTWRITEBYTECODE='1'
 python -m swarm_rescue.launcher --headless --competition -c config/competition_place_eval_plan.yml
 ```
 
-红方入口是 `src/swarm_rescue/solutions/my_drone_eval.py`，当前选择 `MyDronePlaceBaseline`；策略实现在 `src/swarm_rescue/solutions/my_drone_place_baseline.py`。保留存活机接力；v08 在 v06 去噪基础上修补近期融合图的封闭小孔洞。与 v06 的 9 组正常对照（6 小幅提高、3 持平）及 6 组压力对照见 [`PROGRESS.md`](PROGRESS.md)，均为本地成绩。
+红方入口是 `src/swarm_rescue/solutions/my_drone_eval.py`，当前选择 `MyDronePlaceBaseline`；策略实现在 `src/swarm_rescue/solutions/my_drone_place_baseline.py`。保留存活机接力；v09 在 v08 基础上进一步收缩近期融合图的噪声边缘。与 v08 的 10 组正常对照（7 提高、3 持平）及 6 组压力对照见 [`PROGRESS.md`](PROGRESS.md)，均为本地成绩。
 
 正式参赛前须把 `src/swarm_rescue/solutions/team_info.yml` 中的示例队名、成员改为真实信息，并运行 `python scripts/check_submission.py`。`team_number` 保持官方默认整数；不要填入字母数字分享码，平台会分配队伍 ID。公开仓库保留示例个人信息，本地提交包使用真实信息。
 

@@ -462,6 +462,10 @@ class MyDronePlaceBaseline(DroneAbstract):
             border = np.concatenate((holes[0], holes[-1], holes[:, 0], holes[:, -1]))
             fill[np.unique(border)] = False
             grid |= fill[holes].astype(np.uint8)
+            # Fused wall bins retain a noisy fringe after the first trim.
+            # Trim one further pixel, then restore the public boundary frame.
+            grid = cv2.erode(grid, np.ones((3, 3), dtype=np.uint8))
+            cv2.rectangle(grid, (2, 2), (w - 3, h - 3), 1, 5)
         print(f"[place-baseline] submit id={self.identifier}, step={self._step}, walls={len(self._wall_set)}, "
               f"inventory={self.carried_bombs_count()}, peers={len(self._peer)}, "
               f"done={len(self._completed)}/{count}")
